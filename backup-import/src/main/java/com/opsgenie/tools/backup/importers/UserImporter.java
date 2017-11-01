@@ -5,8 +5,9 @@ import com.opsgenie.oas.sdk.api.ContactApi;
 import com.opsgenie.oas.sdk.api.NotificationRuleApi;
 import com.opsgenie.oas.sdk.api.UserApi;
 import com.opsgenie.oas.sdk.model.*;
-import com.opsgenie.tools.backup.EntityListService;
 import com.opsgenie.tools.backup.dto.UserConfig;
+import com.opsgenie.tools.backup.retrieval.EntityRetriever;
+import com.opsgenie.tools.backup.retrieval.UserRetriever;
 import com.opsgenie.tools.backup.util.BackupUtils;
 
 import java.util.ArrayList;
@@ -17,15 +18,19 @@ public class UserImporter extends BaseImporter<UserConfig> {
     private static UserApi userApi = new UserApi();
     private static ContactApi contactApi = new ContactApi();
     private static NotificationRuleApi notificationRuleApi = new NotificationRuleApi();
-    private List<UserConfig> userConfigs;
 
     public UserImporter(String backupRootDirectory, boolean addEntity, boolean updateEntity) {
         super(backupRootDirectory, addEntity, updateEntity);
     }
 
     @Override
+    protected EntityRetriever<UserConfig> initializeEntityRetriever() {
+        return new UserRetriever();
+    }
+
+    @Override
     protected EntityStatus checkEntity(UserConfig entity) throws ApiException {
-        for (UserConfig config : userConfigs) {
+        for (UserConfig config : currentConfigs) {
             final User currentUser = config.getUser();
             if (currentUser.getId().equals(entity.getUser().getId())) {
                 return EntityStatus.EXISTS_WITH_ID;
@@ -34,11 +39,6 @@ public class UserImporter extends BaseImporter<UserConfig> {
             }
         }
         return EntityStatus.NOT_EXIST;
-    }
-
-    @Override
-    protected void populateCurrentEntityList() throws ApiException {
-        userConfigs = EntityListService.listUserConfigs();
     }
 
     @Override
@@ -158,7 +158,7 @@ public class UserImporter extends BaseImporter<UserConfig> {
         }
     }
 
-    protected void updateNotificationRule(User user, NotificationRule notificationRule) throws ApiException {
+    private void updateNotificationRule(User user, NotificationRule notificationRule) throws ApiException {
         UpdateNotificationRulePayload payload = new UpdateNotificationRulePayload();
         payload.setCriteria(notificationRule.getCriteria());
         payload.setEnabled(notificationRule.isEnabled());
@@ -179,7 +179,7 @@ public class UserImporter extends BaseImporter<UserConfig> {
     }
 
     private String findRuleIdByName(User user, NotificationRule notificationRule) {
-        for (UserConfig userConfig : userConfigs) {
+        for (UserConfig userConfig : currentConfigs) {
             if (user.getUsername().equals(userConfig.getUser().getUsername())) {
                 for (NotificationRule currentNotificationRule : userConfig.getNotificationRuleList()) {
                     if (currentNotificationRule.getName().equals(notificationRule.getName())) {
